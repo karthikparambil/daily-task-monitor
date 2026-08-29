@@ -1,0 +1,15 @@
+version: '3.8'
+
+services:
+  web:
+    build: .
+    container_name: daily-task-monitor
+    restart: always
+    ports:
+      # Binds the container's port 5324 exclusively to localhost (127.0.0.1) on the host machine
+      - "127.0.0.1:5324:5324"
+    volumes:
+      # Mounts a data directory so SQLite database persists across container restarts
+      - ./data:/app/data
+    environment:
+      - FLASK_RUN_HOST=0.0.0.0
