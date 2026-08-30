@@ -16,13 +16,41 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     }
 
+    // Holiday/Off Day Logic
+    function handleSpecialDayClick(type, text, emoji) {
+        const currentContent = editor.innerHTML.trim();
+        const isEmpty = currentContent === '' || 
+                        currentContent === '<br>' || 
+                        currentContent === '<ul><li><br></li></ul>' || 
+                        currentContent === '<ul><li></li></ul>';
+        
+        if (!isEmpty) {
+            if (!confirm(`This will replace your current notes with '${text}'. Are you sure?`)) {
+                return;
+            }
+        }
+        
+        editor.innerHTML = `<ul><li><strong>${emoji} ${text}</strong></li></ul>`;
+        saveContent();
+    }
+
+    const holidayBtn = document.getElementById('holiday-btn');
+    if (holidayBtn) {
+        holidayBtn.addEventListener('click', () => handleSpecialDayClick('holiday', 'Holiday', '🏖️'));
+    }
+
+    const offDayBtn = document.getElementById('off-day-btn');
+    if (offDayBtn) {
+        offDayBtn.addEventListener('click', () => handleSpecialDayClick('off-day', 'Off Day', '☕'));
+    }
+
     // Initialize content as list if empty
     if (editor.innerHTML.trim() === '' || editor.innerHTML.trim() === '<br>') {
         editor.innerHTML = '<ul><li><br></li></ul>';
     }
 
     // Auto-save function
-    const saveContent = async () => {
+    async function saveContent() {
         statusText.textContent = 'Saving...';
         statusIndicator.classList.add('saving');
         

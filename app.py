@@ -29,17 +29,39 @@ def view_date(date_str):
     note = models.get_note_by_date(date_str)
     content = note['content'] if note and note['content'] else "<ul><li><br></li></ul>"
     
-    all_dates = models.get_all_dates()
-    if date_str not in all_dates:
-        # If it's a new date that hasn't been saved yet, still show it in sidebar or as current
-        all_dates.insert(0, date_str)
-        # sort again just in case
-        all_dates.sort(reverse=True)
+    all_notes = models.get_all_notes()
+    date_info_list = []
+    all_dates_set = set()
+    
+    for n in all_notes:
+        d = n['date']
+        c = n['content']
+        is_holiday = "🏖️ Holiday" in c
+        is_off_day = "☕ Off Day" in c
+        date_info_list.append({
+            'date': d,
+            'is_holiday': is_holiday,
+            'is_off_day': is_off_day
+        })
+        all_dates_set.add(d)
         
-    # unique dates
-    all_dates = list(dict.fromkeys(all_dates))
+    if date_str not in all_dates_set:
+        date_info_list.insert(0, {
+            'date': date_str,
+            'is_holiday': False,
+            'is_off_day': False
+        })
+        date_info_list.sort(key=lambda x: x['date'], reverse=True)
+        
+    # remove duplicates
+    seen = set()
+    unique_date_info_list = []
+    for di in date_info_list:
+        if di['date'] not in seen:
+            seen.add(di['date'])
+            unique_date_info_list.append(di)
 
-    return render_template('index.html', current_date=date_str, content=content, all_dates=all_dates)
+    return render_template('index.html', current_date=date_str, content=content, all_dates=unique_date_info_list)
 
 @app.route('/api/save/<date_str>', methods=['POST'])
 def save_note(date_str):
