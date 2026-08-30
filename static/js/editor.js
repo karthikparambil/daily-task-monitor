@@ -2,8 +2,19 @@ document.addEventListener('DOMContentLoaded', () => {
     const editor = document.getElementById('editor');
     const statusText = document.getElementById('save-status');
     const statusIndicator = document.querySelector('.status-indicator');
+    const themeToggleBtn = document.getElementById('theme-toggle');
     
     let saveTimeout;
+
+    // Theme Toggle Logic
+    if (themeToggleBtn) {
+        themeToggleBtn.addEventListener('click', () => {
+            const currentTheme = document.documentElement.getAttribute('data-theme') || 'light';
+            const newTheme = currentTheme === 'light' ? 'dark' : 'light';
+            document.documentElement.setAttribute('data-theme', newTheme);
+            localStorage.setItem('theme', newTheme);
+        });
+    }
 
     // Initialize content as list if empty
     if (editor.innerHTML.trim() === '' || editor.innerHTML.trim() === '<br>') {
@@ -70,6 +81,12 @@ document.addEventListener('DOMContentLoaded', () => {
             } else {
                 document.execCommand('indent', false, null);
             }
+        }
+
+        // Handle Shift + Delete (or Shift + Backspace) for outdent
+        if (e.shiftKey && (e.key === 'Delete' || e.key === 'Backspace')) {
+            e.preventDefault();
+            document.execCommand('outdent', false, null);
         }
         
         // Ensure Enter creates new list items appropriately
