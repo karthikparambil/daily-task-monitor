@@ -49,6 +49,11 @@ body {
     overflow: hidden;
     -webkit-font-smoothing: antialiased;
     -moz-osx-font-smoothing: grayscale;
+    transition: background-color 0.3s ease, color 0.3s ease;
+}
+
+body, .sidebar, .main-content, .sidebar-footer, .sidebar-header h2, .glass-header h1, .editor, .editor::before {
+    transition: background-color 0.3s ease, color 0.3s ease, border-color 0.3s ease;
 }
 
 .app-container {
