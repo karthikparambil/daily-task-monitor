@@ -45,13 +45,25 @@ def view_date(date_str):
         })
         all_dates_set.add(d)
         
+    today_str = datetime.now().strftime('%Y-%m-%d')
+    
     if date_str not in all_dates_set:
-        date_info_list.insert(0, {
+        date_info_list.append({
             'date': date_str,
             'is_holiday': False,
             'is_off_day': False
         })
-        date_info_list.sort(key=lambda x: x['date'], reverse=True)
+        all_dates_set.add(date_str)
+        
+    if today_str not in all_dates_set:
+        date_info_list.append({
+            'date': today_str,
+            'is_holiday': False,
+            'is_off_day': False
+        })
+        all_dates_set.add(today_str)
+        
+    date_info_list.sort(key=lambda x: x['date'], reverse=True)
         
     # remove duplicates
     seen = set()
