@@ -38,10 +38,18 @@ def view_date(date_str):
         c = n['content']
         is_holiday = "🏖️ Holiday" in c
         is_off_day = "☕ Off Day" in c
+        
+        empty_states = ["", "<br>", "<ul><li><br></li></ul>", "<ul><li></li></ul>"]
+        if is_holiday or is_off_day or (c and c.strip() in empty_states) or not c:
+            line_count = 0
+        else:
+            line_count = c.count("<li>")
+
         date_info_list.append({
             'date': d,
             'is_holiday': is_holiday,
-            'is_off_day': is_off_day
+            'is_off_day': is_off_day,
+            'line_count': line_count
         })
         all_dates_set.add(d)
         
@@ -51,7 +59,8 @@ def view_date(date_str):
         date_info_list.append({
             'date': date_str,
             'is_holiday': False,
-            'is_off_day': False
+            'is_off_day': False,
+            'line_count': 0
         })
         all_dates_set.add(date_str)
         
@@ -59,7 +68,8 @@ def view_date(date_str):
         date_info_list.append({
             'date': today_str,
             'is_holiday': False,
-            'is_off_day': False
+            'is_off_day': False,
+            'line_count': 0
         })
         all_dates_set.add(today_str)
         
