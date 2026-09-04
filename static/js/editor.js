@@ -84,7 +84,7 @@ document.addEventListener('DOMContentLoaded', () => {
     // Listen for input to trigger auto-save
     editor.addEventListener('input', () => {
         clearTimeout(saveTimeout);
-        statusText.textContent = 'Unsaved changes...';
+        statusText.textContent = 'Saving...';
         // reset error style if it was there
         document.querySelector('.status-dot').style.backgroundColor = '';
         document.querySelector('.status-dot').style.boxShadow = '';
