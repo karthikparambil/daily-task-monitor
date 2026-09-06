@@ -1,5 +1,5 @@
 from flask import Flask, render_template, request, jsonify, redirect, url_for
-from datetime import datetime
+from datetime import datetime, timedelta
 import models
 
 app = Flask(__name__)
@@ -29,59 +29,52 @@ def view_date(date_str):
     note = models.get_note_by_date(date_str)
     content = note['content'] if note and note['content'] else "<ul><li><br></li></ul>"
     
-    all_notes = models.get_all_notes()
-    date_info_list = []
-    all_dates_set = set()
-    
-    for n in all_notes:
-        d = n['date']
-        c = n['content']
-        is_holiday = "🏖️ Holiday" in c
-        is_off_day = "☕ Off Day" in c
-        
-        empty_states = ["", "<br>", "<ul><li><br></li></ul>", "<ul><li></li></ul>"]
-        if is_holiday or is_off_day or (c and c.strip() in empty_states) or not c:
-            line_count = 0
-        else:
-            line_count = c.count("<li>")
-
-        date_info_list.append({
-            'date': d,
-            'is_holiday': is_holiday,
-            'is_off_day': is_off_day,
-            'line_count': line_count
-        })
-        all_dates_set.add(d)
-        
     today_str = datetime.now().strftime('%Y-%m-%d')
     
-    if date_str not in all_dates_set:
-        date_info_list.append({
-            'date': date_str,
-            'is_holiday': False,
-            'is_off_day': False,
-            'line_count': 0
-        })
-        all_dates_set.add(date_str)
+    all_notes = models.get_all_notes()
+    notes_by_date = {n['date']: n for n in all_notes}
+    
+    if not all_notes:
+        earliest_date = datetime.strptime(today_str, '%Y-%m-%d').date()
+    else:
+        earliest_date = datetime.strptime(all_notes[-1]['date'], '%Y-%m-%d').date()
         
-    if today_str not in all_dates_set:
-        date_info_list.append({
-            'date': today_str,
-            'is_holiday': False,
-            'is_off_day': False,
-            'line_count': 0
-        })
-        all_dates_set.add(today_str)
+    req_d = datetime.strptime(date_str, '%Y-%m-%d').date()
+    if req_d < earliest_date:
+        earliest_date = req_d
         
-    date_info_list.sort(key=lambda x: x['date'], reverse=True)
-        
-    # remove duplicates
-    seen = set()
+    today_d = datetime.strptime(today_str, '%Y-%m-%d').date()
+    
     unique_date_info_list = []
-    for di in date_info_list:
-        if di['date'] not in seen:
-            seen.add(di['date'])
-            unique_date_info_list.append(di)
+    current_d = today_d
+    
+    while current_d >= earliest_date:
+        d_str = current_d.strftime('%Y-%m-%d')
+        if d_str in notes_by_date:
+            c = notes_by_date[d_str]['content']
+            is_holiday = "🏖️ Holiday" in c
+            is_off_day = "☕ Off Day" in c
+            
+            empty_states = ["", "<br>", "<ul><li><br></li></ul>", "<ul><li></li></ul>"]
+            if is_holiday or is_off_day or (c and c.strip() in empty_states) or not c:
+                line_count = 0
+            else:
+                line_count = c.count("<li>")
+
+            unique_date_info_list.append({
+                'date': d_str,
+                'is_holiday': is_holiday,
+                'is_off_day': is_off_day,
+                'line_count': line_count
+            })
+        else:
+            unique_date_info_list.append({
+                'date': d_str,
+                'is_holiday': False,
+                'is_off_day': False,
+                'line_count': 0
+            })
+        current_d -= timedelta(days=1)
 
     return render_template('index.html', current_date=date_str, content=content, all_dates=unique_date_info_list)
 
