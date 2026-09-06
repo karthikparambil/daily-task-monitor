@@ -16,32 +16,122 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     }
 
-    // Holiday/Off Day Logic
-    function handleSpecialDayClick(type, text, emoji) {
-        const currentContent = editor.innerHTML.trim();
-        const isEmpty = currentContent === '' || 
-                        currentContent === '<br>' || 
-                        currentContent === '<ul><li><br></li></ul>' || 
-                        currentContent === '<ul><li></li></ul>';
-        
-        if (!isEmpty) {
-            if (!confirm(`This will replace your current notes with '${text}'. Are you sure?`)) {
-                return;
-            }
-        }
-        
-        editor.innerHTML = `<ul><li><strong>${emoji} ${text}</strong></li></ul>`;
-        saveContent();
+    // Helper for today's date and edit permissions
+    function getTodayString() {
+        const today = new Date();
+        const yyyy = today.getFullYear();
+        let mm = today.getMonth() + 1;
+        let dd = today.getDate();
+        if (dd < 10) dd = '0' + dd;
+        if (mm < 10) mm = '0' + mm;
+        return yyyy + '-' + mm + '-' + dd;
     }
 
+    // Sidebar Month Navigation Logic
+    const monthGroups = Array.from(document.querySelectorAll('.month-group'));
+    const prevMonthBtn = document.getElementById('prev-month-btn');
+    const nextMonthBtn = document.getElementById('next-month-btn');
+    const monthLabel = document.getElementById('month-display-label');
+
+    if (monthGroups.length > 0) {
+        let activeIndex = monthGroups.findIndex(g => g.querySelector('.date-item.active') !== null);
+        let currentGroupIndex = activeIndex !== -1 ? activeIndex : 0;
+
+        function updateMonthView(direction = 'none') {
+            monthGroups.forEach((group, index) => {
+                if (index === currentGroupIndex) {
+                    group.style.display = 'block';
+                    group.classList.remove('slide-left', 'slide-right');
+                    // Force DOM reflow to restart animation
+                    void group.offsetWidth; 
+                    if (direction === 'left') {
+                        group.classList.add('slide-left');
+                    } else if (direction === 'right') {
+                        group.classList.add('slide-right');
+                    }
+                    monthLabel.textContent = group.getAttribute('data-month');
+                } else {
+                    group.style.display = 'none';
+                }
+            });
+            
+            // monthGroups is sorted descending (newest first, [Sep 2026, Aug 2026, ...])
+            // Previous (<) = older month = index + 1
+            // Next (>) = newer month = index - 1
+            prevMonthBtn.disabled = currentGroupIndex >= monthGroups.length - 1;
+            nextMonthBtn.disabled = currentGroupIndex <= 0;
+        }
+
+        prevMonthBtn.addEventListener('click', () => {
+            if (currentGroupIndex < monthGroups.length - 1) {
+                currentGroupIndex++;
+                updateMonthView('left');
+            }
+        });
+
+        nextMonthBtn.addEventListener('click', () => {
+            if (currentGroupIndex > 0) {
+                currentGroupIndex--;
+                updateMonthView('right');
+            }
+        });
+
+        // Initialize view
+        updateMonthView();
+    }
+
+    let hasConfirmedEdit = false;
+
+    function requireEditPermission(e) {
+        if (window.CURRENT_DATE === getTodayString() || hasConfirmedEdit) {
+            return true;
+        }
+        
+        if (confirm("You are viewing a past/different date. Are you sure you want to edit it?")) {
+            hasConfirmedEdit = true;
+            return true;
+        } else {
+            if (e) e.preventDefault();
+            editor.blur();
+            return false;
+        }
+    }
+
+    // Holiday/Off Day Logic
     const holidayBtn = document.getElementById('holiday-btn');
     if (holidayBtn) {
-        holidayBtn.addEventListener('click', () => handleSpecialDayClick('holiday', 'Holiday', '🏖️'));
+        holidayBtn.addEventListener('click', (e) => {
+            if (!requireEditPermission(e)) return;
+            window.IS_HOLIDAY = !window.IS_HOLIDAY;
+            if (window.IS_HOLIDAY) {
+                holidayBtn.classList.add('active-state');
+                if (window.IS_OFF_DAY) {
+                    window.IS_OFF_DAY = false;
+                    document.getElementById('off-day-btn').classList.remove('active-state');
+                }
+            } else {
+                holidayBtn.classList.remove('active-state');
+            }
+            saveContent();
+        });
     }
 
     const offDayBtn = document.getElementById('off-day-btn');
     if (offDayBtn) {
-        offDayBtn.addEventListener('click', () => handleSpecialDayClick('off-day', 'Off Day', '☕'));
+        offDayBtn.addEventListener('click', (e) => {
+            if (!requireEditPermission(e)) return;
+            window.IS_OFF_DAY = !window.IS_OFF_DAY;
+            if (window.IS_OFF_DAY) {
+                offDayBtn.classList.add('active-state');
+                if (window.IS_HOLIDAY) {
+                    window.IS_HOLIDAY = false;
+                    document.getElementById('holiday-btn').classList.remove('active-state');
+                }
+            } else {
+                offDayBtn.classList.remove('active-state');
+            }
+            saveContent();
+        });
     }
 
     // Initialize content as list if empty
@@ -61,7 +151,9 @@ document.addEventListener('DOMContentLoaded', () => {
                     'Content-Type': 'application/json'
                 },
                 body: JSON.stringify({
-                    content: editor.innerHTML
+                    content: editor.innerHTML,
+                    is_holiday: window.IS_HOLIDAY,
+                    is_off_day: window.IS_OFF_DAY
                 })
             });
             
@@ -92,8 +184,14 @@ document.addEventListener('DOMContentLoaded', () => {
         saveTimeout = setTimeout(saveContent, 1000); // 1s debounce
     });
 
-    // Handle keyboard shortcuts (Tab, Enter, Ctrl+B)
+    // Handle keyboard shortcuts (Tab, Enter, Ctrl+B, Backspace)
     editor.addEventListener('keydown', (e) => {
+        // Exclude pure navigation keys from prompting
+        const navKeys = ['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight', 'PageUp', 'PageDown', 'Home', 'End', 'Shift', 'Control', 'Alt', 'Meta', 'Escape'];
+        if (!navKeys.includes(e.key)) {
+            if (!requireEditPermission(e)) return;
+        }
+        
         // Handle Ctrl+B or Cmd+B for bold
         if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'b') {
             e.preventDefault();
@@ -109,18 +207,98 @@ document.addEventListener('DOMContentLoaded', () => {
             } else {
                 document.execCommand('indent', false, null);
             }
+            return;
         }
 
         // Handle Shift + Delete (or Shift + Backspace) for outdent
         if (e.shiftKey && (e.key === 'Delete' || e.key === 'Backspace')) {
             e.preventDefault();
             document.execCommand('outdent', false, null);
+            return;
         }
         
-        // Ensure Enter creates new list items appropriately
+        let sel = window.getSelection();
+        if (!sel.rangeCount) return;
+        let range = sel.getRangeAt(0);
+        
+        let startContainer = range.startContainer;
+        let li = startContainer.nodeType === 3 ? startContainer.parentNode.closest('li') : (startContainer.closest ? startContainer.closest('li') : null);
+
+        // Ensure Enter creates new list items appropriately and doesn't break the list
         if (e.key === 'Enter') {
-            // document.execCommand handles Enter within ul/li naturally in modern browsers
+            if (li && li.textContent.trim() === '') {
+                e.preventDefault();
+                let newLi = document.createElement('li');
+                newLi.innerHTML = '<br>';
+                li.parentNode.insertBefore(newLi, li.nextSibling);
+                let newRange = document.createRange();
+                newRange.setStart(newLi, 0);
+                newRange.collapse(true);
+                sel.removeAllRanges();
+                sel.addRange(newRange);
+            } else if (!li) {
+                e.preventDefault();
+                document.execCommand('insertUnorderedList', false, null);
+            }
         }
+        
+        // Handle Backspace to remove bullet point without breaking out of the list
+        if (e.key === 'Backspace' && li) {
+            let isAtStart = false;
+            if (range.startOffset === 0) {
+                if (startContainer === li || startContainer === li.firstChild || li.textContent === '') {
+                    isAtStart = true;
+                }
+            }
+            
+            if (isAtStart) {
+                e.preventDefault();
+                let prevLi = li.previousElementSibling;
+                
+                if (li.textContent === '') {
+                    if (prevLi) {
+                        li.remove();
+                        let newRange = document.createRange();
+                        newRange.selectNodeContents(prevLi);
+                        newRange.collapse(false);
+                        sel.removeAllRanges();
+                        sel.addRange(newRange);
+                    }
+                } else {
+                    if (prevLi) {
+                        let lastChild = prevLi.lastChild;
+                        // For BR at the end of the previous LI, we can remove it so text merges correctly
+                        if (lastChild && lastChild.nodeName === 'BR') {
+                            lastChild.remove();
+                            lastChild = prevLi.lastChild;
+                        }
+                        
+                        while(li.firstChild) {
+                            prevLi.appendChild(li.firstChild);
+                        }
+                        li.remove();
+                        
+                        let newRange = document.createRange();
+                        if (lastChild) {
+                            if (lastChild.nodeType === 3) {
+                                newRange.setStart(lastChild, lastChild.length);
+                            } else {
+                                newRange.setStartAfter(lastChild);
+                            }
+                        } else {
+                            newRange.setStart(prevLi, 0);
+                        }
+                        newRange.collapse(true);
+                        sel.removeAllRanges();
+                        sel.addRange(newRange);
+                    }
+                }
+            }
+        }
+    });
+
+    editor.addEventListener('paste', (e) => {
+        if (!requireEditPermission(e)) return;
     });
 
     // Ensure focus is kept inside the list if clicked empty space

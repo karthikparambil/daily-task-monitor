@@ -19,6 +19,14 @@ def init_db():
             content TEXT
         )
     ''')
+    try:
+        conn.execute('ALTER TABLE daily_notes ADD COLUMN is_holiday BOOLEAN DEFAULT 0')
+    except sqlite3.OperationalError:
+        pass
+    try:
+        conn.execute('ALTER TABLE daily_notes ADD COLUMN is_off_day BOOLEAN DEFAULT 0')
+    except sqlite3.OperationalError:
+        pass
     conn.commit()
     conn.close()
 
@@ -28,13 +36,16 @@ def get_note_by_date(date_str):
     conn.close()
     return note
 
-def save_note_by_date(date_str, content):
+def save_note_by_date(date_str, content, is_holiday=False, is_off_day=False):
     conn = get_db()
     conn.execute('''
-        INSERT INTO daily_notes (date, content)
-        VALUES (?, ?)
-        ON CONFLICT(date) DO UPDATE SET content=excluded.content
-    ''', (date_str, content))
+        INSERT INTO daily_notes (date, content, is_holiday, is_off_day)
+        VALUES (?, ?, ?, ?)
+        ON CONFLICT(date) DO UPDATE SET 
+            content=excluded.content,
+            is_holiday=excluded.is_holiday,
+            is_off_day=excluded.is_off_day
+    ''', (date_str, content, int(is_holiday), int(is_off_day)))
     conn.commit()
     conn.close()
     
@@ -46,6 +57,6 @@ def get_all_dates():
 
 def get_all_notes():
     conn = get_db()
-    notes = conn.execute('SELECT date, content FROM daily_notes ORDER BY date DESC').fetchall()
+    notes = conn.execute('SELECT date, content, is_holiday, is_off_day FROM daily_notes ORDER BY date DESC').fetchall()
     conn.close()
-    return [{"date": row['date'], "content": row['content']} for row in notes]
+    return [{"date": row['date'], "content": row['content'], "is_holiday": bool(row['is_holiday']), "is_off_day": bool(row['is_off_day'])} for row in notes]
