@@ -44,6 +44,15 @@ def view_date(date_str):
         is_off_day_current = False
         content = "<ul><li><br></li></ul>"
         
+    return render_template('index.html', 
+                           current_date=date_str, 
+                           content=content, 
+                           all_dates=[],
+                           is_holiday_current=is_holiday_current,
+                           is_off_day_current=is_off_day_current)
+
+@app.route('/api/sidebar_dates/<date_str>')
+def sidebar_dates(date_str):
     today_str = datetime.now().strftime('%Y-%m-%d')
     
     all_notes = models.get_all_notes()
@@ -109,12 +118,7 @@ def view_date(date_str):
         ordered_date_list.extend(list(g)[::-1])
     unique_date_info_list = ordered_date_list
 
-    return render_template('index.html', 
-                           current_date=date_str, 
-                           content=content, 
-                           all_dates=unique_date_info_list,
-                           is_holiday_current=is_holiday_current,
-                           is_off_day_current=is_off_day_current)
+    return jsonify(unique_date_info_list)
 
 @app.route('/api/save/<date_str>', methods=['POST'])
 def save_note(date_str):

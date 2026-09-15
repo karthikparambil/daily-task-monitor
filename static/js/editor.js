@@ -27,58 +27,122 @@ document.addEventListener('DOMContentLoaded', () => {
         return yyyy + '-' + mm + '-' + dd;
     }
 
-    // Sidebar Month Navigation Logic
-    const monthGroups = Array.from(document.querySelectorAll('.month-group'));
-    const prevMonthBtn = document.getElementById('prev-month-btn');
-    const nextMonthBtn = document.getElementById('next-month-btn');
-    const monthLabel = document.getElementById('month-display-label');
+    async function loadSidebarDates() {
+        try {
+            const data = await window.sidebarDatesPromise;
+            
+            const nav = document.getElementById('sidebar-date-list');
+            if (!nav) return;
 
-    if (monthGroups.length > 0) {
-        let activeIndex = monthGroups.findIndex(g => g.querySelector('.date-item.active') !== null);
-        let currentGroupIndex = activeIndex !== -1 ? activeIndex : 0;
-
-        function updateMonthView(direction = 'none') {
-            monthGroups.forEach((group, index) => {
-                if (index === currentGroupIndex) {
-                    group.style.display = 'block';
-                    group.classList.remove('slide-left', 'slide-right');
-                    // Force DOM reflow to restart animation
-                    void group.offsetWidth; 
-                    if (direction === 'left') {
-                        group.classList.add('slide-left');
-                    } else if (direction === 'right') {
-                        group.classList.add('slide-right');
+            let html = '';
+            let prevMonth = '';
+            let monthCount = 0;
+            
+            data.forEach(d => {
+                if (d.month_label !== prevMonth) {
+                    if (monthCount > 0) {
+                        html += '</div>';
                     }
-                    monthLabel.textContent = group.getAttribute('data-month');
-                } else {
-                    group.style.display = 'none';
+                    html += `<div class="month-group" data-month="${d.month_label}" style="display: none;">`;
+                    prevMonth = d.month_label;
+                    monthCount++;
                 }
+                
+                const isActive = d.date === window.CURRENT_DATE ? 'active' : '';
+                let iconHtml = '';
+                
+                if (d.is_holiday) {
+                    iconHtml = '🏖️';
+                } else if (d.is_off_day) {
+                    iconHtml = '☕';
+                } else {
+                    iconHtml = `<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="opacity: 0.7;">
+                                    <path d="M8 2v4"/>
+                                    <path d="M16 2v4"/>
+                                    <rect width="18" height="18" x="3" y="4" rx="2"/>
+                                    <path d="M3 10h18"/>
+                                </svg>`;
+                }
+                
+                let lineCountHtml = '';
+                if (d.line_count && d.line_count > 0) {
+                    lineCountHtml = `<span style="font-size: 0.75rem; color: var(--text-secondary); opacity: 0.7;">${d.line_count}</span>`;
+                }
+                
+                html += `<a href="/${d.date}" class="date-item ${isActive}" style="justify-content: space-between;">
+                            <div style="display: flex; align-items: center;">
+                                <span class="icon" style="opacity: 1;">${iconHtml}</span>
+                                ${d.date}
+                            </div>
+                            ${lineCountHtml}
+                        </a>`;
             });
             
-            // monthGroups is sorted descending (newest first, [Sep 2026, Aug 2026, ...])
-            // Previous (<) = older month = index + 1
-            // Next (>) = newer month = index - 1
-            prevMonthBtn.disabled = currentGroupIndex >= monthGroups.length - 1;
-            nextMonthBtn.disabled = currentGroupIndex <= 0;
+            if (monthCount > 0) {
+                html += '</div>';
+            }
+            
+            nav.innerHTML = html;
+            initMonthNav();
+        } catch (error) {
+            console.error('Failed to load sidebar dates:', error);
         }
-
-        prevMonthBtn.addEventListener('click', () => {
-            if (currentGroupIndex < monthGroups.length - 1) {
-                currentGroupIndex++;
-                updateMonthView('left');
-            }
-        });
-
-        nextMonthBtn.addEventListener('click', () => {
-            if (currentGroupIndex > 0) {
-                currentGroupIndex--;
-                updateMonthView('right');
-            }
-        });
-
-        // Initialize view
-        updateMonthView();
     }
+
+    function initMonthNav() {
+        const monthGroups = Array.from(document.querySelectorAll('.month-group'));
+        const prevMonthBtn = document.getElementById('prev-month-btn');
+        const nextMonthBtn = document.getElementById('next-month-btn');
+        const monthLabel = document.getElementById('month-display-label');
+
+        if (monthGroups.length > 0) {
+            let activeIndex = monthGroups.findIndex(g => g.querySelector('.date-item.active') !== null);
+            let currentGroupIndex = activeIndex !== -1 ? activeIndex : 0;
+
+            function updateMonthView(direction = 'none') {
+                monthGroups.forEach((group, index) => {
+                    if (index === currentGroupIndex) {
+                        group.style.display = 'block';
+                        group.classList.remove('slide-left', 'slide-right');
+                        void group.offsetWidth; 
+                        if (direction === 'left') {
+                            group.classList.add('slide-left');
+                        } else if (direction === 'right') {
+                            group.classList.add('slide-right');
+                        }
+                        monthLabel.textContent = group.getAttribute('data-month');
+                    } else {
+                        group.style.display = 'none';
+                    }
+                });
+                
+                prevMonthBtn.disabled = currentGroupIndex >= monthGroups.length - 1;
+                nextMonthBtn.disabled = currentGroupIndex <= 0;
+            }
+
+            if (prevMonthBtn) {
+                prevMonthBtn.onclick = () => {
+                    if (currentGroupIndex < monthGroups.length - 1) {
+                        currentGroupIndex++;
+                        updateMonthView('left');
+                    }
+                };
+            }
+
+            if (nextMonthBtn) {
+                nextMonthBtn.onclick = () => {
+                    if (currentGroupIndex > 0) {
+                        currentGroupIndex--;
+                        updateMonthView('right');
+                    }
+                };
+            }
+
+            updateMonthView();
+        }
+    }
+
+    loadSidebarDates();
 
     let hasConfirmedEdit = false;
 
