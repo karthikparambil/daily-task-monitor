@@ -61,7 +61,8 @@ def sidebar_dates(date_str):
     if not all_notes:
         earliest_date = datetime.strptime(today_str, '%Y-%m-%d').date()
     else:
-        earliest_date = datetime.strptime(all_notes[-1]['date'], '%Y-%m-%d').date()
+        earliest_str = min(n['date'] for n in all_notes)
+        earliest_date = datetime.strptime(earliest_str, '%Y-%m-%d').date()
         
     req_d = datetime.strptime(date_str, '%Y-%m-%d').date()
     if req_d < earliest_date:

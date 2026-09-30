@@ -57,6 +57,6 @@ def get_all_dates():
 
 def get_all_notes():
     conn = get_db()
-    notes = conn.execute('SELECT date, content, is_holiday, is_off_day FROM daily_notes ORDER BY date DESC').fetchall()
+    notes = conn.execute('SELECT date, content, is_holiday, is_off_day FROM daily_notes ORDER BY date ASC').fetchall()
     conn.close()
     return [{"date": row['date'], "content": row['content'], "is_holiday": bool(row['is_holiday']), "is_off_day": bool(row['is_off_day'])} for row in notes]

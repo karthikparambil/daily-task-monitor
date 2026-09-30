@@ -251,8 +251,16 @@ document.addEventListener('DOMContentLoaded', () => {
     // Handle keyboard shortcuts (Tab, Enter, Ctrl+B, Backspace)
     editor.addEventListener('keydown', (e) => {
         // Exclude pure navigation keys from prompting
-        const navKeys = ['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight', 'PageUp', 'PageDown', 'Home', 'End', 'Shift', 'Control', 'Alt', 'Meta', 'Escape'];
-        if (!navKeys.includes(e.key)) {
+        const navKeys = [
+            'ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight', 'PageUp', 'PageDown', 'Home', 'End', 
+            'Shift', 'Control', 'Alt', 'Meta', 'Escape',
+            'F1', 'F2', 'F3', 'F4', 'F5', 'F6', 'F7', 'F8', 'F9', 'F10', 'F11', 'F12'
+        ];
+        
+        // Exclude non-editing shortcuts (like Copy, Select All, Reload, Find)
+        const isNonEditShortcut = (e.ctrlKey || e.metaKey) && ['c', 'a', 'r', 'f', 'p', 's', 'w', 't'].includes(e.key.toLowerCase());
+
+        if (!navKeys.includes(e.key) && !isNonEditShortcut) {
             if (!requireEditPermission(e)) return;
         }
         
@@ -439,6 +447,9 @@ document.addEventListener('DOMContentLoaded', () => {
             const response = await fetch('/api/notes/all');
             if (!response.ok) throw new Error('Network response was not ok');
             const notes = await response.json();
+
+            // Ensure notes are sorted in ascending date order
+            notes.sort((a, b) => a.date.localeCompare(b.date));
 
             let fullMarkdown = '# Daily Task Monitor Report\n\n';
 
