@@ -387,8 +387,14 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     });
 
-    // Export to Markdown Logic
+    // Export to Markdown Modal & Logic
     const exportBtn = document.getElementById('export-md');
+    const exportModal = document.getElementById('export-modal');
+    const exportModalClose = document.getElementById('export-modal-close');
+    const cancelExportBtn = document.getElementById('cancel-export-btn');
+    const confirmExportBtn = document.getElementById('confirm-export-btn');
+    const exportMonthSelect = document.getElementById('export-month-select');
+    const scopeRadios = document.querySelectorAll('input[name="export-scope"]');
     
     function getOrdinalNum(n) {
         return n + (n > 0 ? ['th', 'st', 'nd', 'rd'][(n > 3 && n < 21) || n % 10 > 3 ? 0 : n % 10] : '');
@@ -401,6 +407,14 @@ document.addEventListener('DOMContentLoaded', () => {
         const month = date.toLocaleString('default', { month: 'short' });
         const year = date.getFullYear();
         return `${day} ${month} ${year}`;
+    }
+
+    function getMonthLabelForDate(dateStr) {
+        const parts = dateStr.split('-');
+        const date = new Date(parts[0], parts[1] - 1, parts[2]);
+        const month = date.toLocaleString('default', { month: 'short' });
+        const year = date.getFullYear();
+        return `${month} ${year}`;
     }
 
     function domToMarkdown(node, depth = 0) {
@@ -439,51 +453,150 @@ document.addEventListener('DOMContentLoaded', () => {
         return md;
     }
 
-    exportBtn.addEventListener('click', async () => {
+    async function openExportModal() {
+        if (!exportModal) return;
+
         try {
-            exportBtn.textContent = 'Generating...';
-            exportBtn.disabled = true;
+            const data = await window.sidebarDatesPromise;
+            if (data && data.length > 0) {
+                const months = [];
+                data.forEach(d => {
+                    if (d.month_label && !months.includes(d.month_label)) {
+                        months.push(d.month_label);
+                    }
+                });
 
-            const response = await fetch('/api/notes/all');
-            if (!response.ok) throw new Error('Network response was not ok');
-            const notes = await response.json();
+                if (exportMonthSelect) {
+                    exportMonthSelect.innerHTML = '';
+                    months.forEach(m => {
+                        const opt = document.createElement('option');
+                        opt.value = m;
+                        opt.textContent = m;
+                        exportMonthSelect.appendChild(opt);
+                    });
 
-            // Ensure notes are sorted in ascending date order
-            notes.sort((a, b) => a.date.localeCompare(b.date));
-
-            let fullMarkdown = '# Daily Task Monitor Report\n\n';
-
-            notes.forEach(note => {
-                const dateFormatted = formatDateForExport(note.date);
-                fullMarkdown += `**Date:** ${dateFormatted}\n`;
-                
-                // Use a temporary div to parse HTML content safely
-                const tempDiv = document.createElement('div');
-                tempDiv.innerHTML = note.content;
-                const md = domToMarkdown(tempDiv);
-                
-                if (md.trim()) {
-                    fullMarkdown += md + '\n\n';
-                } else {
-                    fullMarkdown += '\n\n';
+                    const currentMonthLabel = document.getElementById('month-display-label')?.textContent;
+                    if (currentMonthLabel && months.includes(currentMonthLabel)) {
+                        exportMonthSelect.value = currentMonthLabel;
+                    }
                 }
-            });
+            }
+        } catch (e) {
+            console.error('Failed to populate months for export modal:', e);
+        }
 
-            // Trigger download
-            const blob = new Blob([fullMarkdown], { type: 'text/markdown' });
-            const url = URL.createObjectURL(blob);
-            const a = document.createElement('a');
-            a.href = url;
-            a.download = `Daily_Task_Report.md`;
-            a.click();
-            URL.revokeObjectURL(url);
-        } catch (error) {
-            console.error('Error exporting report:', error);
-            alert("Failed to export report.");
-        } finally {
-            // Restore button content
-            exportBtn.innerHTML = '<svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" x2="12" y1="15" y2="3"/></svg> Export .md';
-            exportBtn.disabled = false;
+        exportModal.style.display = 'flex';
+    }
+
+    function closeExportModal() {
+        if (exportModal) {
+            exportModal.style.display = 'none';
+        }
+    }
+
+    if (exportBtn) {
+        exportBtn.addEventListener('click', openExportModal);
+    }
+    if (exportModalClose) {
+        exportModalClose.addEventListener('click', closeExportModal);
+    }
+    if (cancelExportBtn) {
+        cancelExportBtn.addEventListener('click', closeExportModal);
+    }
+
+    if (exportModal) {
+        exportModal.addEventListener('click', (e) => {
+            if (e.target === exportModal) {
+                closeExportModal();
+            }
+        });
+    }
+
+    document.addEventListener('keydown', (e) => {
+        if (e.key === 'Escape' && exportModal && exportModal.style.display !== 'none') {
+            closeExportModal();
         }
     });
+
+    scopeRadios.forEach(radio => {
+        radio.addEventListener('change', (e) => {
+            if (exportMonthSelect) {
+                exportMonthSelect.disabled = (e.target.value !== 'month');
+            }
+        });
+    });
+
+    if (exportMonthSelect) {
+        exportMonthSelect.addEventListener('focus', () => {
+            const monthRadio = document.querySelector('input[name="export-scope"][value="month"]');
+            if (monthRadio) {
+                monthRadio.checked = true;
+                exportMonthSelect.disabled = false;
+            }
+        });
+    }
+
+    if (confirmExportBtn) {
+        confirmExportBtn.addEventListener('click', async () => {
+            const selectedScope = document.querySelector('input[name="export-scope"]:checked')?.value || 'all';
+            const selectedMonth = exportMonthSelect ? exportMonthSelect.value : '';
+
+            try {
+                confirmExportBtn.textContent = 'Generating...';
+                confirmExportBtn.disabled = true;
+
+                const response = await fetch('/api/notes/all');
+                if (!response.ok) throw new Error('Network response was not ok');
+                let notes = await response.json();
+
+                // Sort notes in ascending date order (chronological)
+                notes.sort((a, b) => a.date.localeCompare(b.date));
+
+                // Filter notes if specific month selected
+                if (selectedScope === 'month' && selectedMonth) {
+                    notes = notes.filter(note => getMonthLabelForDate(note.date) === selectedMonth);
+                }
+
+                let fullMarkdown = (selectedScope === 'month' && selectedMonth)
+                    ? `# Daily Task Monitor Report - ${selectedMonth}\n\n`
+                    : '# Daily Task Monitor Report (All Notes)\n\n';
+
+                notes.forEach(note => {
+                    const dateFormatted = formatDateForExport(note.date);
+                    fullMarkdown += `**Date:** ${dateFormatted}\n`;
+                    
+                    const tempDiv = document.createElement('div');
+                    tempDiv.innerHTML = note.content;
+                    const md = domToMarkdown(tempDiv);
+                    
+                    if (md.trim()) {
+                        fullMarkdown += md + '\n\n';
+                    } else {
+                        fullMarkdown += '\n\n';
+                    }
+                });
+
+                const filename = (selectedScope === 'month' && selectedMonth)
+                    ? `Daily_Task_Report_${selectedMonth.replace(/\s+/g, '_')}.md`
+                    : `Daily_Task_Report_All.md`;
+
+                // Trigger download
+                const blob = new Blob([fullMarkdown], { type: 'text/markdown' });
+                const url = URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                a.href = url;
+                a.download = filename;
+                a.click();
+                URL.revokeObjectURL(url);
+
+                closeExportModal();
+            } catch (error) {
+                console.error('Error exporting report:', error);
+                alert("Failed to export report.");
+            } finally {
+                confirmExportBtn.innerHTML = '<svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" x2="12" y1="15" y2="3"/></svg> Download .md';
+                confirmExportBtn.disabled = false;
+            }
+        });
+    }
 });
