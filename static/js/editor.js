@@ -27,6 +27,39 @@ document.addEventListener('DOMContentLoaded', () => {
         return yyyy + '-' + mm + '-' + dd;
     }
 
+    function restoreSidebarScroll() {
+        const nav = document.getElementById('sidebar-date-list');
+        if (!nav) return;
+
+        const savedScroll = sessionStorage.getItem('sidebar_scroll_top');
+        if (savedScroll !== null) {
+            nav.scrollTop = parseInt(savedScroll, 10);
+        }
+        
+        const activeItem = nav.querySelector('.date-item.active');
+        if (activeItem) {
+            const navRect = nav.getBoundingClientRect();
+            const itemRect = activeItem.getBoundingClientRect();
+            
+            if (itemRect.top < navRect.top || itemRect.bottom > navRect.bottom) {
+                activeItem.scrollIntoView({ block: 'nearest' });
+            }
+        }
+    }
+
+    const navElement = document.getElementById('sidebar-date-list');
+    if (navElement) {
+        navElement.addEventListener('scroll', () => {
+            sessionStorage.setItem('sidebar_scroll_top', navElement.scrollTop);
+        });
+        navElement.addEventListener('click', (e) => {
+            const item = e.target.closest('.date-item');
+            if (item) {
+                sessionStorage.setItem('sidebar_scroll_top', navElement.scrollTop);
+            }
+        });
+    }
+
     async function loadSidebarDates() {
         try {
             const data = await window.sidebarDatesPromise;
@@ -84,6 +117,7 @@ document.addEventListener('DOMContentLoaded', () => {
             
             nav.innerHTML = html;
             initMonthNav();
+            restoreSidebarScroll();
         } catch (error) {
             console.error('Failed to load sidebar dates:', error);
         }
@@ -124,7 +158,9 @@ document.addEventListener('DOMContentLoaded', () => {
                 prevMonthBtn.onclick = () => {
                     if (currentGroupIndex < monthGroups.length - 1) {
                         currentGroupIndex++;
+                        sessionStorage.removeItem('sidebar_scroll_top');
                         updateMonthView('left');
+                        restoreSidebarScroll();
                     }
                 };
             }
@@ -133,7 +169,9 @@ document.addEventListener('DOMContentLoaded', () => {
                 nextMonthBtn.onclick = () => {
                     if (currentGroupIndex > 0) {
                         currentGroupIndex--;
+                        sessionStorage.removeItem('sidebar_scroll_top');
                         updateMonthView('right');
+                        restoreSidebarScroll();
                     }
                 };
             }
